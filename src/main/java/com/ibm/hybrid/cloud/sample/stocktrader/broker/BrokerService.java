@@ -1,5 +1,5 @@
 /*
-       Copyright 2020-2021 IBM Corp All Rights Reserved
+       Copyright 2020-2022 IBM Corp All Rights Reserved
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -160,16 +160,13 @@ public class BrokerService extends Application {
 				logger.fine("Calling AccountClient.getAccounts()");
 				accounts = accountClient.getAccounts(jwt);
 				accountCount = accounts.length;
-			} catch (Throwable t) {
-				logException(t);
-			}
 
-			// Match up the accounts and portfolios
-			// TODO: Pagination should reduce the amount of work to do here
-			Map<String, Account> mapOfAccounts = Arrays.stream(accounts).collect(Collectors.toMap(Account::get_id, account -> account));
-			Set<String> accountIds = Arrays.stream(accounts).map(Account::get_id).collect(Collectors.toSet());
+				// Match up the accounts and portfolios
+				// TODO: Pagination should reduce the amount of work to do here
+				Map<String, Account> mapOfAccounts = Arrays.stream(accounts).collect(Collectors.toMap(Account::get_id, account -> account));
+				Set<String> accountIds = Arrays.stream(accounts).map(Account::get_id).collect(Collectors.toSet());
 
-			brokersSet = Arrays.stream(portfolios)
+				brokersSet = Arrays.stream(portfolios)
 					.parallel()
 					.filter(portfolio -> accountIds.contains(portfolio.getAccountID()))
 					.map(portfolio -> {
@@ -180,8 +177,8 @@ public class BrokerService extends Application {
 					})
 					.collect(Collectors.toSet());
 
-			// Now handle the cases where there is no matching account-portfolio mapping
-			brokersSet.addAll(Arrays.stream(portfolios)
+				// Now handle the cases where there is no matching account-portfolio mapping
+				brokersSet.addAll(Arrays.stream(portfolios)
 					.parallel()
 					.filter(Predicate.not(portfolio -> accountIds.contains(portfolio.getAccountID())))
 					.map(portfolio -> {
@@ -190,16 +187,22 @@ public class BrokerService extends Application {
 						return new Broker(portfolio, null);
 					})
 					.collect(Collectors.toSet()));
+				
+				brokers = brokersSet.stream().toArray(Broker[]::new);
+			} catch (Throwable t) {
+				logException(t);
+			} else {
+				//just build the Broker array directly from the Portfolio array, since Accout is disabled
+				logger.fine("Handling case of Account being disabled");
+				for (int index=0; index<portfolioCount; index++) {
+					brokers[index] = new Broker(portfolio[index], null);
+				}
+			}
 		}
 		
-		logger.fine("Returning "+portfolioCount+" portfolios");
+		logger.fine("Returning "+portfolioCount+" brokers");
 
-		if(brokersSet != null) {
-			brokers = brokersSet.stream().toArray(Broker[]::new);
-			return brokers;
-		} else {
-			return null;
-		}
+		return brokers;
 	}
 
 	@POST

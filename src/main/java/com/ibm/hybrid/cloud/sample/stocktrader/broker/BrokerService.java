@@ -195,7 +195,7 @@ public class BrokerService extends Application {
 				//just build the Broker array directly from the Portfolio array, since Accout is disabled
 				logger.fine("Handling case of Account being disabled");
 				for (int index=0; index<portfolioCount; index++) {
-					brokers[index] = new Broker(portfolio[index], null);
+					brokers[index] = new Broker(portfolios[index], null);
 				}
 			}
 		}

@@ -84,7 +84,7 @@ public class BrokerService extends Application {
 	private static final double DONT_RECALCULATE = -1.0;
 
 	private static boolean useAccount = false;
-	private static boolean useS3 = false;
+	private static boolean useTradeHistory = false;
 	private static boolean useCQRS = false;
 	private static boolean initialized = false;
 	private static boolean staticInitialized = false;
@@ -98,11 +98,12 @@ public class BrokerService extends Application {
 		useAccount = Boolean.parseBoolean(System.getenv("ACCOUNT_ENABLED"));
 		logger.info("Account microservice enabled: " + useAccount);
 
-		useS3 = Boolean.parseBoolean(System.getenv("S3_ENABLED"));
-		logger.info("S3 enabled: " + useS3);
+		useTradeHistory = Boolean.parseBoolean(System.getenv("TRADE_HISTORY_ENABLED"));
+		logger.info("Trade History microservice enabled: " + useTradeHistory);
 
 		useCQRS = Boolean.parseBoolean(System.getenv("CQRS_ENABLED"));
 		logger.info("CQRS enabled: " + useCQRS);
+		if (useCQRS) logger.warning("CQRS requested, but not using the broker-query flavor of this microservice!");
 
 		String mpUrlPropName = PortfolioClient.class.getName() + "/mp-rest/url";
 		String urlFromEnv = System.getenv("PORTFOLIO_URL");
@@ -138,10 +139,6 @@ public class BrokerService extends Application {
 //	@RolesAllowed({"StockTrader", "StockViewer"}) //Couldn't get this to work; had to do it through the web.xml instead :(
 	public Broker[] getBrokers(@Context HttpServletRequest request) {
 		String jwt = request.getHeader("Authorization");
-
-		if (useCQRS) {
-			logger.info("getBrokers: Placeholder for when CQRS support is added");
-		}
 
 		logger.fine("Calling PortfolioClient.getPortfolios()");
 		Portfolio[] portfolios = portfolioClient.getPortfolios(jwt);
@@ -247,10 +244,6 @@ public class BrokerService extends Application {
 		Portfolio portfolio = null;
 		String jwt = request.getHeader("Authorization");
 
-		if (useCQRS) {
-			logger.info("getBroker: Placeholder for when CQRS support is added");
-		}
-
 		logger.fine("Calling PortfolioClient.getPortfolio()");
 		portfolio = portfolioClient.getPortfolio(jwt, owner, false);
 
@@ -279,6 +272,11 @@ public class BrokerService extends Application {
 	@Path("/{owner}/returns")
 	@Produces(MediaType.TEXT_PLAIN)
 	public String getPortfolioReturns(@PathParam("owner") String owner, @Context HttpServletRequest request) {
+		if (!useTradeHistory) {
+			logger.info("getPortfolioReturns called yet TRADE_HISTORY_ENABLED is false!");
+			return "Unavailable";
+		}
+
 		String jwt = request.getHeader("Authorization");
 
 		logger.fine("Getting portfolio returns");

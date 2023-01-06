@@ -89,6 +89,7 @@ public class BrokerService extends Application {
 	private static boolean initialized = false;
 	private static boolean staticInitialized = false;
 
+	private @Inject @ConfigProperty(name = "TEST_MODE", defaultValue = "false") boolean testMode;
 	private @Inject @RestClient PortfolioClient portfolioClient;
 	private @Inject @RestClient AccountClient accountClient;
 	private @Inject @RestClient TradeHistoryClient tradeHistoryClient;
@@ -138,6 +139,8 @@ public class BrokerService extends Application {
 	@Produces(MediaType.APPLICATION_JSON)
 //	@RolesAllowed({"StockTrader", "StockViewer"}) //Couldn't get this to work; had to do it through the web.xml instead :(
 	public Broker[] getBrokers(@Context HttpServletRequest request) {
+		if (testMode) return getHardcodedBrokers();
+
 		String jwt = request.getHeader("Authorization");
 
 		logger.fine("Calling PortfolioClient.getPortfolios()");
@@ -392,6 +395,29 @@ public class BrokerService extends Application {
 		logger.fine("Returning "+answer);
 
 		return feedback;
+	}
+
+	Broker[] getHardcodedBrokers() {
+		Broker john = new Broker("John");
+		john.setTotal(1234.56);
+		john.setLoyalty("Basic");
+		Broker karri = new Broker("Karri");
+		karri.setTotal(12345.67);
+		karri.setLoyalty("Bronze");
+		Broker ryan = new Broker("Ryan");
+		ryan.setTotal(23456.78);
+		ryan.setLoyalty("Bronze");
+		Broker raunak = new Broker("Raunak");
+		raunak.setTotal(98765.43);
+		raunak.setLoyalty("Silver");
+		Broker greg = new Broker("Greg");
+		greg.setTotal(123456.78);
+		greg.setLoyalty("Gold");
+		Broker eric = new Broker("Eric");
+		eric.setTotal(1234567.89);
+		eric.setLoyalty("Platinum");
+		Broker[] brokers = { john, karri, ryan, raunak, greg, eric };
+		return brokers;
 	}
 
 	static void logException(Throwable t) {

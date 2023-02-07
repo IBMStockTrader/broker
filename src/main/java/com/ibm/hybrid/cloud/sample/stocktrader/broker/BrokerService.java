@@ -384,6 +384,24 @@ public class BrokerService extends Application {
 				logException(t);
 			}
 			broker = new Broker(portfolio, account);
+
+			CashAccount cashAccount = null;
+			if (useCashAccount) try {
+				double lastTrade = portfolio.getLastTrade();
+				if (lastTrade > 0) {
+					logger.fine("Calling CashAccountClient.debit()");
+					cashAccount = cashAccountClient.debit(jwt, owner, lastTrade);
+				} else {
+					logger.fine("Calling CashAccountClient.credit()");
+					cashAccount = cashAccountClient.credit(jwt, owner, lastTrade);
+				}
+				if (cashAccount != null) {
+					broker.setCashAccountBalance(cashAccount.getBalance());
+					broker.setCashAccountCurrency(cashAccount.getCurrency());
+				}
+			} catch (Throwable t) {
+				logException(t);
+			}	
 		} else {
 			answer = "null";
 		}

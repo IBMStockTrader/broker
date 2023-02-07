@@ -1,5 +1,5 @@
 /*
-       Copyright 2017-2021 IBM Corp All Rights Reserved
+       Copyright 2017-2023 IBM Corp All Rights Reserved
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -41,8 +41,10 @@ public class Broker {
     private int free;
     private String sentiment;
     private double nextCommission;
+    private double cashAccountBalance;
+    private String cashAccountCurrency;
     private JsonObject stocks;
-    private NumberFormat currency = null;
+    private NumberFormat currencyFormatter = null;
     private static double ERROR = -1.0;
 
 
@@ -153,6 +155,22 @@ public class Broker {
         nextCommission = newNextCommission;
     }
 
+    public double getCashAccountBalance() {
+        return cashAccountBalance;
+    }
+
+    public void setCashAccountBalance(double newCashAccountBalance) {
+        cashAcountBalance = newCashAcountBalance;
+    }
+
+    public String getCashAccountCurrency() {
+        return cashAccountCurrency;
+    }
+
+    public void setCashAccountCurrency(String newCashAccountCurrency) {
+        cashAcountCurrency = newCashAcountCurrency;
+    }
+
     public JsonObject getStocks() {
         return stocks;
     }
@@ -201,16 +219,16 @@ public class Broker {
    }
 
     public String toString() {
-        if (currency == null) {
-            currency = NumberFormat.getNumberInstance();
-            currency.setMinimumFractionDigits(2);
-            currency.setMaximumFractionDigits(2);
-            currency.setRoundingMode(RoundingMode.HALF_UP);
+        if (currencyFormatter == null) {
+            currencyFormatter = NumberFormat.getNumberInstance();
+            currencyFormatter.setMinimumFractionDigits(2);
+            currencyFormatter.setMaximumFractionDigits(2);
+            currencyFormatter.setRoundingMode(RoundingMode.HALF_UP);
         }
 
-        return "{\"owner\": \""+owner+"\", \"total\": "+currency.format(total)+", \"loyalty\": \""+loyalty
-               +"\", \"balance\": "+currency.format(balance)+", \"commissions\": "+currency.format(commissions)
-               +", \"free\": "+free+", \"nextCommission\": "+currency.format(nextCommission)
+        return "{\"owner\": \""+owner+"\", \"total\": "+currencyFormatter.format(total)+", \"loyalty\": \""+loyalty
+               +"\", \"balance\": "+currencyFormatter.format(balance)+", \"commissions\": "+currencyFormatter.format(commissions)
+               +", \"free\": "+free+", \"nextCommission\": "+currencyFormatter.format(nextCommission)
                +", \"sentiment\": \""+sentiment+"\", \"stocks\": "+(stocks!=null?getStocksJSON():"{}")+"}";
     }
 
@@ -239,8 +257,8 @@ public class Broker {
             number = stock.getJsonNumber("commission");
             double commission = (number != null) ? number.doubleValue() : ERROR;
             
-            json.append("\"key\": {\"symbol\": \""+symbol+"\", \"shares\": "+shares+", \"price\": "+currency.format(price)
-                +", \"date\": \""+date+"\", \"total\": "+currency.format(totalValue)+", \"commission\": "+currency.format(commission)+"}");
+            json.append("\"key\": {\"symbol\": \""+symbol+"\", \"shares\": "+shares+", \"price\": "+currencyFormatter.format(price)
+                +", \"date\": \""+date+"\", \"total\": "+currencyFormatter.format(totalValue)+", \"commission\": "+currencyFormatter.format(commission)+"}");
         }
 
         return json.append("}").toString();

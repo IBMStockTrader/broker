@@ -249,6 +249,19 @@ public class BrokerService extends Application {
 		} else {
 			answer = "null";
 		}
+
+		CashAccount cashAccount = null;
+		if (useCashAccount) try {
+			logger.fine("Calling CashAccountClient.createCashAccount()");
+			cashAccount = cashAccountClient.createCashAccount(jwt, owner);
+			if (cashAccount != null) {
+				broker.setCashAccountBalance(cashAccount.getBalance());
+				broker.setCashAccountCurrency(cashAccount.getCurrency());
+			}
+		} catch (Throwable t) {
+			logException(t);
+		}
+
 		logger.fine("Returning "+answer);
 
 		return broker;
@@ -279,6 +292,18 @@ public class BrokerService extends Application {
 				logException(t);
 			}
 			broker = new Broker(portfolio, account);
+
+			CashAccount cashAccount = null;
+			if (useCashAccount) try {
+				logger.fine("Calling CashAccountClient.getCashAccount()");
+				cashAccount = cashAccountClient.getCashAccount(jwt, owner);
+				if (cashAccount != null) {
+					broker.setCashAccountBalance(cashAccount.getBalance());
+					broker.setCashAccountCurrency(cashAccount.getCurrency());
+				}
+			} catch (Throwable t) {
+				logException(t);
+			}	
 		} else {
 			answer = "null";
 		}
@@ -386,6 +411,18 @@ public class BrokerService extends Application {
 				logException(t);
 			}
 			broker = new Broker(portfolio, account);
+
+			CashAccount cashAccount = null;
+			if (useCashAccount) try {
+				logger.fine("Calling CashAccountClient.deleteCashAccount()");
+				cashAccount = cashAccountClient.deleteCashAccount(jwt, owner);
+				if (cashAccount != null) {
+					broker.setCashAccountBalance(cashAccount.getBalance());
+					broker.setCashAccountCurrency(cashAccount.getCurrency());
+				}
+			} catch (Throwable t) {
+				logException(t);
+			}	
 		} else {
 			answer = "null";
 		}

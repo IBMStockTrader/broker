@@ -1,5 +1,6 @@
 /*
-       Copyright 2020-2023 IBM Corp All Rights Reserved
+       Copyright 2020-2021 IBM Corp, All Rights Reserved
+       Copyright 2021-2023 Kyndryl, All Rights Reserved
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -83,6 +84,7 @@ import javax.ws.rs.Path;
 public class BrokerService extends Application {
 	private static Logger logger = Logger.getLogger(BrokerService.class.getName());
 
+	private static final String DEFAULT_CURRENCY = "USD";
 	private static final double DONT_RECALCULATE = -1.0;
 
 	private static boolean useAccount = false;
@@ -225,7 +227,7 @@ public class BrokerService extends Application {
 	@Path("/{owner}")
 	@Produces(MediaType.APPLICATION_JSON)
 	//	@RolesAllowed({"StockTrader"}) //Couldn't get this to work; had to do it through the web.xml instead :(
-	public Broker createBroker(@PathParam("owner") String owner, @Context HttpServletRequest request) {
+	public Broker createBroker(@PathParam("owner") String owner, @QueryParam("balance") double balance, @QueryParam("currency") String currency, @Context HttpServletRequest request) {
 		Broker broker = null;
 		Portfolio portfolio = null;
 		String jwt = request.getHeader("Authorization");
@@ -252,8 +254,10 @@ public class BrokerService extends Application {
 
 		CashAccount cashAccount = null;
 		if (useCashAccount) try {
+			if (currency == null) currency = DEFAULT_CURRENCY;
+			cashAccount = new CashAccount(owner, balance, currency);
 			logger.fine("Calling CashAccountClient.createCashAccount()");
-			cashAccount = cashAccountClient.createCashAccount(jwt, owner);
+			cashAccount = cashAccountClient.createCashAccount(jwt, owner, cashAccount);
 			if (cashAccount != null) {
 				broker.setCashAccountBalance(cashAccount.getBalance());
 				broker.setCashAccountCurrency(cashAccount.getCurrency());

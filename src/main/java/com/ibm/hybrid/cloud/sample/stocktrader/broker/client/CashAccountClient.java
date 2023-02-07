@@ -52,13 +52,13 @@ public interface CashAccountClient {
 	@Path("/{owner}")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-	public CashAccount createCashAccount(@HeaderParam("Authorization") String jwt, @PathParam("owner") String owner);
+	public CashAccount createCashAccount(@HeaderParam("Authorization") String jwt, @PathParam("owner") String owner, CashAccount cashAccount);
 
 	@PUT
 	@Path("/{owner}")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-	public CashAccount updateCashAccount(@HeaderParam("Authorization") String jwt, @PathParam("owner") String owner, @QueryParam("total") double total);
+	public CashAccount updateCashAccount(@HeaderParam("Authorization") String jwt, @PathParam("owner") String owner, CashAccount cashAccount);
 
 	@DELETE
 	@Path("/{owner}")

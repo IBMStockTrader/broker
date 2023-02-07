@@ -1,5 +1,6 @@
 /*
-       Copyright 2020-2021 IBM Corp All Rights Reserved
+       Copyright 2020-2021 IBM Corp, All Rights Reserved
+       Copyright 2023 Kyndryl, All Rights Reserved
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -46,6 +47,7 @@ public class Portfolio {
     private String owner;
 
     private double total;
+    private double lastTrade;
 
     @Column(nullable = true, length = 64)
     private String accountID;
@@ -84,6 +86,14 @@ public class Portfolio {
 
     public void setTotal(double newTotal) {
         total = newTotal;
+    }
+
+    public double getLastTrade() {
+        return lastTrade;
+    }
+
+    public void setLastTrade(double newLastTrade) {
+        lastTrade = newLastTrade;
     }
 
     public String getAccountID() {

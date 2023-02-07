@@ -160,7 +160,7 @@ public class Broker {
     }
 
     public void setCashAccountBalance(double newCashAccountBalance) {
-        cashAcountBalance = newCashAcountBalance;
+        cashAccountBalance = newCashAccountBalance;
     }
 
     public String getCashAccountCurrency() {
@@ -168,7 +168,7 @@ public class Broker {
     }
 
     public void setCashAccountCurrency(String newCashAccountCurrency) {
-        cashAcountCurrency = newCashAcountCurrency;
+        cashAccountCurrency = newCashAccountCurrency;
     }
 
     public JsonObject getStocks() {

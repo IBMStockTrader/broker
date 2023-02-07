@@ -1,5 +1,5 @@
 /*
-       Copyright 2020-2022 IBM Corp All Rights Reserved
+       Copyright 2020-2023 IBM Corp All Rights Reserved
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -17,10 +17,12 @@
 package com.ibm.hybrid.cloud.sample.stocktrader.broker;
 
 import com.ibm.hybrid.cloud.sample.stocktrader.broker.client.AccountClient;
+import com.ibm.hybrid.cloud.sample.stocktrader.broker.client.CashAccountClient;
 import com.ibm.hybrid.cloud.sample.stocktrader.broker.client.PortfolioClient;
 import com.ibm.hybrid.cloud.sample.stocktrader.broker.client.TradeHistoryClient;
 import com.ibm.hybrid.cloud.sample.stocktrader.broker.json.Account;
 import com.ibm.hybrid.cloud.sample.stocktrader.broker.json.Broker;
+import com.ibm.hybrid.cloud.sample.stocktrader.broker.json.CashAccount;
 import com.ibm.hybrid.cloud.sample.stocktrader.broker.json.Feedback;
 import com.ibm.hybrid.cloud.sample.stocktrader.broker.json.Portfolio;
 import com.ibm.hybrid.cloud.sample.stocktrader.broker.json.WatsonInput;
@@ -84,6 +86,7 @@ public class BrokerService extends Application {
 	private static final double DONT_RECALCULATE = -1.0;
 
 	private static boolean useAccount = false;
+	private static boolean useCashAccount = false;
 	private static boolean useTradeHistory = false;
 	private static boolean useCQRS = false;
 	private static boolean initialized = false;
@@ -92,12 +95,16 @@ public class BrokerService extends Application {
 	private @Inject @ConfigProperty(name = "TEST_MODE", defaultValue = "false") boolean testMode;
 	private @Inject @RestClient PortfolioClient portfolioClient;
 	private @Inject @RestClient AccountClient accountClient;
+	private @Inject @RestClient CashAccountClient cashAccountClient;
 	private @Inject @RestClient TradeHistoryClient tradeHistoryClient;
 
 	// Override ODM Client URL if secret is configured to provide URL
 	static {
 		useAccount = Boolean.parseBoolean(System.getenv("ACCOUNT_ENABLED"));
 		logger.info("Account microservice enabled: " + useAccount);
+
+		useCashAccount = Boolean.parseBoolean(System.getenv("CASH_ACCOUNT_ENABLED"));
+		logger.info("Cash Account microservice enabled: " + useCashAccount);
 
 		useTradeHistory = Boolean.parseBoolean(System.getenv("TRADE_HISTORY_ENABLED"));
 		logger.info("Trade History microservice enabled: " + useTradeHistory);
@@ -122,6 +129,15 @@ public class BrokerService extends Application {
 			System.setProperty(mpUrlPropName, urlFromEnv);
 		} else {
 			logger.info("Account URL not found from env var from config map, so defaulting to value in jvm.options: " + System.getProperty(mpUrlPropName));
+		}
+
+		mpUrlPropName = CashAccountClient.class.getName() + "/mp-rest/url";
+		urlFromEnv = System.getenv("CASH_ACCOUNT_URL");
+		if ((urlFromEnv != null) && !urlFromEnv.isEmpty()) {
+			logger.info("Using Cash Account URL from config map: " + urlFromEnv);
+			System.setProperty(mpUrlPropName, urlFromEnv);
+		} else {
+			logger.info("Cash Account URL not found from env var from config map, so defaulting to value in jvm.options: " + System.getProperty(mpUrlPropName));
 		}
 
 		mpUrlPropName = TradeHistoryClient.class.getName() + "/mp-rest/url";

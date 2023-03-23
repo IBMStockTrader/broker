@@ -386,22 +386,26 @@ public class BrokerService extends Application {
 			broker = new Broker(portfolio, account);
 
 			CashAccount cashAccount = null;
-			if (useCashAccount) try {
+			if (useCashAccount) {
 				double lastTrade = portfolio.getLastTrade();
-				if (lastTrade > 0) {
-					logger.fine("Calling CashAccountClient.debit()");
-					cashAccount = cashAccountClient.debit(jwt, owner, lastTrade);
-				} else {
-					logger.fine("Calling CashAccountClient.credit()");
-					cashAccount = cashAccountClient.credit(jwt, owner, lastTrade);
+				if (lastTrade == 0) {
+					logger.warning("Trade amount was zero - skipping calling CashAccount");
+				} else try {
+					if (lastTrade > 0) {
+						logger.fine("Calling CashAccountClient.debit()");
+						cashAccount = cashAccountClient.debit(jwt, owner, lastTrade);
+					} else {
+						logger.fine("Calling CashAccountClient.credit()");
+						cashAccount = cashAccountClient.credit(jwt, owner, Math.abs(lastTrade));
+					}
+					if (cashAccount != null) {
+						broker.setCashAccountBalance(cashAccount.getBalance());
+						broker.setCashAccountCurrency(cashAccount.getCurrency());
+					}
+				} catch (Throwable t) {
+					logException(t);
 				}
-				if (cashAccount != null) {
-					broker.setCashAccountBalance(cashAccount.getBalance());
-					broker.setCashAccountCurrency(cashAccount.getCurrency());
-				}
-			} catch (Throwable t) {
-				logException(t);
-			}	
+			}
 		} else {
 			answer = "null";
 		}

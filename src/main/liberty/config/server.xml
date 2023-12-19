@@ -1,5 +1,6 @@
 <!--
        Copyright 2020-2021 IBM Corp All Rights Reserved
+       Copyright 2022-2023 Kyndryl All Rights Reserved
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -18,7 +19,6 @@
     <featureManager>
         <feature>microProfile-4.1</feature>
         <feature>appSecurity-2.0</feature>
-        <feature>monitor-1.0</feature>
 <!--    <feature>logstashCollector-1.1</feature> -->
     </featureManager>
 
@@ -36,39 +36,16 @@
 
     <ssl id="defaultSSLConfig" keyStoreRef="defaultKeyStore" trustStoreRef="defaultTrustStore" trustDefaultCerts="true" />
 
+    <variable name="AUTH_TYPE" defaultValue="basic"/>
     <variable name="JWT_AUDIENCE" defaultValue="stock-trader"/>
     <variable name="JWT_ISSUER" defaultValue="http://stock-trader.ibm.com"/>
 
-    <jwtBuilder id="defaultJWT" keyStoreRef="defaultTrustStore" keyAlias="jwtSigner" issuer="${JWT_ISSUER}" audiences="${JWT_AUDIENCE}" />
-    <mpJwt id="stockTraderJWT" audiences="${JWT_AUDIENCE}" issuer="${JWT_ISSUER}" keyName="jwtSigner" ignoreApplicationAuthMethod="false" expiry="12h" sslRef="defaultSSLConfig"/>
+    <include optional="false" location="${server.config.dir}/includes/${AUTH_TYPE}.xml"/>
 
     <mpMetrics authentication="false"/>
 
 <!--
     <logstashCollector source="message,trace,ffdc,accessLog" hostName="logstash" port="5044"/>
--->
-
-<!-- Authentication is via JWT SSO
-    <basicRegistry id="basic" realm="BasicRegistry">
-        <user name="admin" password="admin"/>
-        <user name="stock" password="trader"/>
-        <user name="debug" password="debug"/>
-        <user name="read"  password="only"/>
-        <user name="other" password="other"/>
-        <user name="jalcorn@us.ibm.com" password="test"/>
-        <group name="StockTrader">
-            <member name="stock"/>
-            <member name="debug"/>
-            <member name="jalcorn@us.ibm.com"/>
-        </group>
-        <group name="StockViewer">
-            <member name="read"/>
-        </group>
-    </basicRegistry>
-
-    <administrator-role>
-    	<user>admin</user>
-    </administrator-role>
 -->
 
     <ltpa expiration="1h"/>

@@ -181,8 +181,8 @@ public class BrokerService extends Application {
 
 				// Match up the accounts and portfolios
 				// TODO: Pagination should reduce the amount of work to do here
-				Map<String, Account> mapOfAccounts = Arrays.stream(accounts).collect(Collectors.toMap(Account::get_id, account -> account));
-				Set<String> accountIds = Arrays.stream(accounts).map(Account::get_id).collect(Collectors.toSet());
+				Map<String, Account> mapOfAccounts = Arrays.stream(accounts).collect(Collectors.toMap(Account::getId, account -> account));
+				Set<String> accountIds = Arrays.stream(accounts).map(Account::getId).collect(Collectors.toSet());
 
 				brokersSet = Arrays.stream(portfolios)
 					.parallel()
@@ -237,7 +237,7 @@ public class BrokerService extends Application {
 		if (useAccount) try {
 			logger.fine("Calling AccountClient.createAccount()");
 			account = accountClient.createAccount(jwt, owner);
-			if (account != null) accountID = account.get_id();
+			if (account != null) accountID = account.getId();
 		} catch (Throwable t) {
 			logException(t);
 		}

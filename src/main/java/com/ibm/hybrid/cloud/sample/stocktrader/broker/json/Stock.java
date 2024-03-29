@@ -1,5 +1,6 @@
 /*
-       Copyright 2017-2019 IBM Corp All Rights Reserved
+       Copyright 2017-2021 IBM Corp All Rights Reserved
+       Copyright 2022-2024 Kyndryl, All Rights Reserved
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -16,14 +17,14 @@
 
 package com.ibm.hybrid.cloud.sample.stocktrader.broker.json;
 
-import javax.persistence.Entity;
-import javax.persistence.Table;
-import javax.persistence.Id;
-import javax.persistence.IdClass;
-import javax.persistence.JoinColumn;
-import javax.persistence.NamedQuery;
-import javax.persistence.Column;
-import javax.persistence.ManyToOne;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
+import jakarta.persistence.Id;
+import jakarta.persistence.IdClass;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.NamedQuery;
+import jakarta.persistence.Column;
+import jakarta.persistence.ManyToOne;
 
 @Entity
 @Table

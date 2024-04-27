@@ -49,7 +49,7 @@ public interface AccountClient {
 	@Path("/")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-	public Account[] getAccounts(@HeaderParam("Authorization") String jwt);
+    public Account[] getAccounts(@HeaderParam("Authorization") String jwt);
 
 	@GET
 	@Path("/{id}")

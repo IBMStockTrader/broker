@@ -17,6 +17,8 @@
 
 package com.ibm.hybrid.cloud.sample.stocktrader.broker.client;
 
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import jakarta.ws.rs.ApplicationPath;
@@ -27,16 +29,20 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.Path;
+import org.eclipse.microprofile.rest.client.annotation.RegisterClientHeaders;
 import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 
 @ApplicationPath("/")
 @Path("/")
 @ApplicationScoped
 @RegisterRestClient
+@RegisterClientHeaders //To enable JWT propagation
+// JWT is propagated.  See src/main/resources/META-INF/microprofile-config.properties
 /** mpRestClient "remote" interface for the trade history microservice */
 public interface TradeHistoryClient {
     @GET
     @Path("/returns/{owner}")
     @Produces(MediaType.TEXT_PLAIN)
-    public String getReturns(@HeaderParam("Authorization") String jwt, @PathParam("owner") String ownerName, @QueryParam("currentValue") Double portfolioValue);
+    @WithSpan(kind = SpanKind.CLIENT, value="TradeHistoryClient.getReturns")
+    public String getReturns(@PathParam("owner") String ownerName, @QueryParam("currentValue") Double portfolioValue);
 }

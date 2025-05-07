@@ -33,26 +33,28 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 
 //Logging (JSR 47)
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 //CDI 2.0
+import io.opentelemetry.context.Scope;
+import jakarta.annotation.security.RolesAllowed;
+import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.enterprise.context.RequestScoped;
 
 //mpConfig 1.3
+import jakarta.ws.rs.*;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 //mpJWT 1.1
 import org.eclipse.microprofile.auth.LoginConfig;
 
 //mpRestClient 1.3
+import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 
 //Servlet 4.0
@@ -62,21 +64,15 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.ws.rs.core.Application;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.ApplicationPath;
-import jakarta.ws.rs.Consumes;
-import jakarta.ws.rs.DELETE;
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.POST;
-import jakarta.ws.rs.PUT;
-import jakarta.ws.rs.PathParam;
-import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.QueryParam;
-import jakarta.ws.rs.Path;
+
+//MP OpenTelemetry
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.Tracer;
 
 @ApplicationPath("/")
 @Path("/")
 @LoginConfig(authMethod = "MP-JWT", realmName = "jwt-jaspi")
-@RequestScoped //enable interceptors like @Transactional (note you need a WEB-INF/beans.xml in your war)
+@ApplicationScoped //enable interceptors like @Transactional (note you need a WEB-INF/beans.xml in your war)
 /** This microservice is the controller in a model-view-controller architecture, doing the routing and
  *  combination of results from other microservices.  Note that the Portfolio microservice it calls is
  *  mandatory, whereas the Account and TradeHistory microservices are optional.
@@ -99,6 +95,11 @@ public class BrokerService extends Application {
 	private @Inject @RestClient AccountClient accountClient;
 	private @Inject @RestClient CashAccountClient cashAccountClient;
 	private @Inject @RestClient TradeHistoryClient tradeHistoryClient;
+
+	@Inject private Tracer tracer;
+
+	@Inject
+	JsonWebToken jwt;
 
 	// Override ODM Client URL if secret is configured to provide URL
 	static {
@@ -155,73 +156,175 @@ public class BrokerService extends Application {
 	@GET
 	@Path("/")
 	@Produces(MediaType.APPLICATION_JSON)
-//	@RolesAllowed({"StockTrader", "StockViewer"}) //Couldn't get this to work; had to do it through the web.xml instead :(
-	public Broker[] getBrokers(@Context HttpServletRequest request) {
+	@RolesAllowed({"StockTrader", "StockViewer"})
+	public List<Broker> getBrokers(@QueryParam("page") @DefaultValue("1") int pageNumber, @QueryParam("pageSize") @DefaultValue("10") int pageSize) {
 		if (testMode) return getHardcodedBrokers();
 
-		String jwt = request.getHeader("Authorization");
-
-		logger.fine("Calling PortfolioClient.getPortfolios()");
-		Portfolio[] portfolios = portfolioClient.getPortfolios(jwt);
+		//Microprofile will propagate headers. Check src/main/resources/META-INF/microprofile-config.properties.
+//		List<Portfolio> portfolios = portfolioClient.getPortfolios(jwt);
+		Span getPortfoliosSpan = tracer.spanBuilder("portfolioClient.getPortfolios("+pageNumber+", "+pageSize+")")
+				.startSpan();
+		List<Portfolio> portfolios;
+		try (Scope scope = getPortfoliosSpan.makeCurrent()) {
+			logger.fine("Calling PortfolioClient.getPortfolios(pageNumber, pageSize)" + " ("+pageNumber+", "+pageSize+")");
+			portfolios = portfolioClient.getPortfolios(pageNumber, pageSize);
+		}
+		finally {
+			getPortfoliosSpan.end();
+		}
 
 		int portfolioCount=0;
-		Broker[] brokers = null;
-		Set<Broker> brokersSet = new HashSet<>();
-		if (portfolios!=null) {
-			portfolioCount = portfolios.length;
-			int accountCount = 0;
+		List<Broker> brokers = Collections.emptyList();
+		Set<Broker> brokersSet;
+		if (portfolios!=null && portfolios.size()!=0) {
+			portfolioCount = portfolios.size();
+			logger.fine("Portfolio count is: " + portfolioCount);
 
-			brokers = new Broker[portfolioCount];
-			Account[] accounts = new Account[portfolioCount];
+			brokers = new ArrayList<>(portfolioCount);
+			List<Account> accounts;
 
 			if (useAccount) try {
 				logger.fine("Calling AccountClient.getAccounts()");
-				accounts = accountClient.getAccounts(jwt);
-				accountCount = accounts.length;
+				List<String> owners = portfolios.parallelStream().map(Portfolio::getOwner).collect(Collectors.toUnmodifiableList());
+				Span getAccountsSpan = tracer.spanBuilder("accountClient.getAccounts("+pageNumber+", "+pageSize+", "+owners+")")
+						.startSpan();
+				try (Scope scope = getAccountsSpan.makeCurrent()) {
+					logger.fine("Getting accounts for these owners: " + owners);
+					accounts = accountClient.getAccounts(pageNumber, pageSize, owners);
+				}
+				finally {
+					getAccountsSpan.end();
+				}
 
+				Span reconcileSpan = tracer.spanBuilder("Reconciling accounts and portfolios").startSpan();
 				// Match up the accounts and portfolios
 				// TODO: Pagination should reduce the amount of work to do here
-				Map<String, Account> mapOfAccounts = Arrays.stream(accounts).collect(Collectors.toMap(Account::getId, account -> account));
-				Set<String> accountIds = Arrays.stream(accounts).map(Account::getId).collect(Collectors.toSet());
+				try (Scope scope = reconcileSpan.makeCurrent()) {
+					Map<String, Account> mapOfAccounts = accounts
+							.stream()
+							.filter(a -> a.getId() !="null" || a.getId()!=null)
+							.collect(Collectors.toMap(Account::getId, account -> account));
+					Set<String> accountIds = accounts
+							.stream()
+							.map(Account::getId)
+							.collect(Collectors.toSet());
 
-				brokersSet = Arrays.stream(portfolios)
-					.parallel()
-					.filter(portfolio -> accountIds.contains(portfolio.getAccountID()))
-					.map(portfolio -> {
-						String ownerId = portfolio.getAccountID();
-						// Don't log here, you'll get a NPE if you uncomment the following line
-						// logger.finer("Found account corresponding to the portfolio for " + owner);
-						return new Broker(portfolio, mapOfAccounts.get(ownerId));
-					})
-					.collect(Collectors.toSet());
+					brokersSet = portfolios.stream()
+							.parallel()
+							.filter(portfolio -> accountIds.contains(portfolio.getAccountID()))
+							.map(portfolio -> {
+								String ownerId = portfolio.getAccountID();
+								// Don't log here, you'll get a NPE if you uncomment the following line
+								// logger.finer("Found account corresponding to the portfolio for " + owner);
+								return new Broker(portfolio, mapOfAccounts.get(ownerId));
+							})
+							.collect(Collectors.toSet());
 
-				// Now handle the cases where there is no matching account-portfolio mapping
-				brokersSet.addAll(Arrays.stream(portfolios)
-					.parallel()
-					.filter(Predicate.not(portfolio -> accountIds.contains(portfolio.getAccountID())))
-					.map(portfolio -> {
-						// Don't log here, you'll get a NPE
-						// logger.finer("Did not find account corresponding to the portfolio for " + owner);
-						return new Broker(portfolio, null);
-					})
-					.collect(Collectors.toSet()));
-				
-				brokers = brokersSet.stream().toArray(Broker[]::new);
+					// Now handle the cases where there is no matching account-portfolio mapping
+					brokersSet.addAll(portfolios.stream()
+							.parallel()
+							.filter(Predicate.not(portfolio -> accountIds.contains(portfolio.getAccountID())))
+							.map(portfolio -> {
+								// Don't log here, you'll get a NPE
+								// logger.finer("Did not find account corresponding to the portfolio for " + owner);
+								return new Broker(portfolio, null);
+							})
+							.collect(Collectors.toSet()));
+				}
+				finally {
+					reconcileSpan.end();
+				}
+
+				brokers = brokersSet.stream().toList();
 			} catch (Throwable t) {
 				logException(t);
 			} else {
-				//just build the Broker array directly from the Portfolio array, since Accout is disabled
+				//just build the Broker array directly from the Portfolio array, since Account is disabled
 				logger.fine("Handling case of Account being disabled");
 				for (int index=0; index<portfolioCount; index++) {
-					brokers[index] = new Broker(portfolios[index], null);
+					brokers.add(new Broker(portfolios.get(index), null));
 				}
 			}
 		}
-		
-		logger.fine("Returning "+portfolioCount+" brokers");
+
+		logger.fine("Returning " + brokers.size() + " brokers");
 
 		return brokers;
 	}
+
+//	@GET
+//	@Path("/")
+//	@Produces(MediaType.APPLICATION_JSON)
+//	@Deprecated
+////	@RolesAllowed({"StockTrader", "StockViewer"}) //Couldn't get this to work; had to do it through the web.xml instead :(
+//	public List<Broker> getBrokers() {
+//		if (testMode) return getHardcodedBrokers();
+//
+//		logger.fine("Calling PortfolioClient.getPortfolios()");
+//		List<Portfolio> portfolios = portfolioClient.getPortfolios();
+//
+//		int portfolioCount=0;
+//		List<Broker> brokers = Collections.emptyList();
+//		Set<Broker> brokersSet;
+//		if (portfolios!=null && portfolios.size()!=0) {
+//			portfolioCount = portfolios.size();
+//
+//            brokers = new ArrayList<>(portfolioCount);
+//			List<Account> accounts;
+//
+//			if (useAccount) try {
+//				logger.fine("Calling AccountClient.getAccounts()");
+//				accounts = accountClient.getAccounts();
+//
+//                // Match up the accounts and portfolios
+//				// TODO: Pagination should reduce the amount of work to do here
+//				Map<String, Account> mapOfAccounts = accounts
+//						.stream()
+//						.filter(a -> a.getId() !="null" || a.getId()!=null)
+//						.collect(Collectors.toMap(Account::getId, account -> account));
+//				Set<String> accountIds = accounts
+//						.stream()
+//						.map(Account::getId)
+//						.collect(Collectors.toSet());
+//
+//				brokersSet = portfolios.stream()
+//					.parallel()
+//					.filter(portfolio -> accountIds.contains(portfolio.getAccountID()))
+//					.map(portfolio -> {
+//						String ownerId = portfolio.getAccountID();
+//						// Don't log here, you'll get a NPE if you uncomment the following line
+//						// logger.finer("Found account corresponding to the portfolio for " + owner);
+//						return new Broker(portfolio, mapOfAccounts.get(ownerId));
+//					})
+//					.collect(Collectors.toSet());
+//
+//				// Now handle the cases where there is no matching account-portfolio mapping
+//				brokersSet.addAll(portfolios.stream()
+//					.parallel()
+//					.filter(Predicate.not(portfolio -> accountIds.contains(portfolio.getAccountID())))
+//					.map(portfolio -> {
+//						// Don't log here, you'll get a NPE
+//						// logger.finer("Did not find account corresponding to the portfolio for " + owner);
+//						return new Broker(portfolio, null);
+//					})
+//					.collect(Collectors.toSet()));
+//
+//				brokers = brokersSet.stream().toList();
+//			} catch (Throwable t) {
+//				logException(t);
+//			} else {
+//				//just build the Broker array directly from the Portfolio array, since Account is disabled
+//				logger.fine("Handling case of Account being disabled");
+//				for (int index=0; index<portfolioCount; index++) {
+//					brokers.add(new Broker(portfolios.get(index), null));
+//				}
+//			}
+//		}
+//
+//		logger.fine("Returning " + brokers.size() + " brokers");
+//
+//		return brokers;
+//	}
 
 	@POST
 	@Path("/{owner}")
@@ -230,20 +333,19 @@ public class BrokerService extends Application {
 	public Broker createBroker(@PathParam("owner") String owner, @QueryParam("balance") double balance, @QueryParam("currency") String currency, @Context HttpServletRequest request) {
 		Broker broker = null;
 		Portfolio portfolio = null;
-		String jwt = request.getHeader("Authorization");
 
 		Account account = null;
 		String accountID = null;
 		if (useAccount) try {
 			logger.fine("Calling AccountClient.createAccount()");
-			account = accountClient.createAccount(jwt, owner);
+			account = accountClient.createAccount(owner);
 			if (account != null) accountID = account.getId();
 		} catch (Throwable t) {
 			logException(t);
 		}
 
 		logger.fine("Calling PortfolioClient.createPortfolio()");
-		portfolio = portfolioClient.createPortfolio(jwt, owner, accountID);
+		portfolio = portfolioClient.createPortfolio(owner, accountID);
 
 		String answer = "broker";
 		if (portfolio != null) {
@@ -257,7 +359,7 @@ public class BrokerService extends Application {
 			if (currency == null) currency = DEFAULT_CURRENCY;
 			cashAccount = new CashAccount(owner, balance, currency);
 			logger.fine("Calling CashAccountClient.createCashAccount()");
-			cashAccount = cashAccountClient.createCashAccount(jwt, owner, cashAccount);
+			cashAccount = cashAccountClient.createCashAccount(owner, cashAccount);
 			if (cashAccount != null) {
 				broker.setCashAccountBalance(cashAccount.getBalance());
 				broker.setCashAccountCurrency(cashAccount.getCurrency());
@@ -278,10 +380,9 @@ public class BrokerService extends Application {
 	public Broker getBroker(@PathParam("owner") String owner, @Context HttpServletRequest request) {
 		Broker broker = null;
 		Portfolio portfolio = null;
-		String jwt = request.getHeader("Authorization");
 
 		logger.fine("Calling PortfolioClient.getPortfolio()");
-		portfolio = portfolioClient.getPortfolio(jwt, owner, false);
+		portfolio = portfolioClient.getPortfolio(owner, false);
 
 		String answer = "broker";
 		if (portfolio!=null) {
@@ -290,7 +391,7 @@ public class BrokerService extends Application {
 			Account account = null;
 			if (useAccount) try {
 				logger.fine("Calling AccountClient.getAccount()");
-				account = accountClient.getAccount(jwt, accountID, total);
+				account = accountClient.getAccount(accountID, total);
 				if (account == null) logger.warning("Account not found for "+owner);
 			} catch (Throwable t) {
 				logException(t);
@@ -300,7 +401,7 @@ public class BrokerService extends Application {
 			CashAccount cashAccount = null;
 			if (useCashAccount) try {
 				logger.fine("Calling CashAccountClient.getCashAccount()");
-				cashAccount = cashAccountClient.getCashAccount(jwt, owner);
+				cashAccount = cashAccountClient.getCashAccount(owner);
 				if (cashAccount != null) {
 					broker.setCashAccountBalance(cashAccount.getBalance());
 					broker.setCashAccountCurrency(cashAccount.getCurrency());
@@ -325,16 +426,14 @@ public class BrokerService extends Application {
 			return "Unavailable";
 		}
 
-		String jwt = request.getHeader("Authorization");
-
 		logger.fine("Getting portfolio returns");
 		String result = "Unknown";
-		Portfolio portfolio = portfolioClient.getPortfolio(jwt, owner, true); //throws a 404 exception if not present
+		Portfolio portfolio = portfolioClient.getPortfolio(owner, true); //throws a 404 exception if not present
 		if (portfolio != null) {
 			Double portfolioValue = portfolio.getTotal();
 
 			try {
-				result = tradeHistoryClient.getReturns(jwt, owner, portfolioValue);
+				result = tradeHistoryClient.getReturns(owner, portfolioValue);
 				logger.fine("Got portfolio returns for "+owner);
 			} catch (Throwable t) {
 				logger.info("Unable to invoke TradeHistory.  This is an optional microservice and the following exception is expected if it is not deployed");
@@ -354,24 +453,23 @@ public class BrokerService extends Application {
 		Broker broker = null;
 		Account account = null;
 		Portfolio portfolio = null;
-		String jwt = request.getHeader("Authorization");
 
 		double commission = 0.0;
 		String accountID = null;
 		if (useAccount) try {
 			logger.fine("Calling PortfolioClient.getPortfolio() to get accountID in updateBroker()");
-			portfolio = portfolioClient.getPortfolio(jwt, owner, false); //throws a 404 if it doesn't exist
+			portfolio = portfolioClient.getPortfolio(owner, false); //throws a 404 if it doesn't exist
 			accountID = portfolio.getAccountID();
 
 			logger.fine("Calling AccountClient.getAccount() to get commission in updateBroker()");
-			account = accountClient.getAccount(jwt, accountID, DONT_RECALCULATE);
+			account = accountClient.getAccount(accountID, DONT_RECALCULATE);
 			commission = account.getNextCommission();
 		} catch (Throwable t) {
 			logException(t);
 		}
 
 		logger.fine("Calling PortfolioClient.updatePortfolio()");
-		portfolio = portfolioClient.updatePortfolio(jwt, owner, symbol, shares, commission);
+		portfolio = portfolioClient.updatePortfolio(owner, symbol, shares, commission);
 
 		String answer = "broker";
 		if (portfolio!=null) {
@@ -379,7 +477,7 @@ public class BrokerService extends Application {
 			account = null;
 			if (useAccount) try {
 				logger.fine("Calling AccountClient.updateAccount()");
-				account = accountClient.updateAccount(jwt, accountID, total);
+				account = accountClient.updateAccount(accountID, total);
 			} catch (Throwable t) {
 				logException(t);
 			}
@@ -393,10 +491,10 @@ public class BrokerService extends Application {
 				} else try {
 					if (lastTrade > 0) {
 						logger.fine("Calling CashAccountClient.debit()");
-						cashAccount = cashAccountClient.debit(jwt, owner, lastTrade);
+						cashAccount = cashAccountClient.debit(owner, lastTrade);
 					} else {
 						logger.fine("Calling CashAccountClient.credit()");
-						cashAccount = cashAccountClient.credit(jwt, owner, Math.abs(lastTrade));
+						cashAccount = cashAccountClient.credit(owner, Math.abs(lastTrade));
 					}
 					if (cashAccount != null) {
 						broker.setCashAccountBalance(cashAccount.getBalance());
@@ -421,10 +519,9 @@ public class BrokerService extends Application {
 	public Broker deleteBroker(@PathParam("owner") String owner, @Context HttpServletRequest request) {
 		Broker broker = null;
 		Portfolio portfolio = null;
-		String jwt = request.getHeader("Authorization");
 
 		logger.fine("Calling PortfolioClient.deletePortfolio()");
-		portfolio = portfolioClient.deletePortfolio(jwt, owner);
+		portfolio = portfolioClient.deletePortfolio(owner);
 
 		String answer = "broker";
 		if (portfolio!=null) {
@@ -432,7 +529,7 @@ public class BrokerService extends Application {
 			if (useAccount) try {
 				String accountID = portfolio.getAccountID();
 				logger.fine("Calling AccountClient.deleteAccount()");
-				account = accountClient.deleteAccount(jwt, accountID);
+				account = accountClient.deleteAccount(accountID);
 			} catch (Throwable t) {
 				logException(t);
 			}
@@ -441,7 +538,7 @@ public class BrokerService extends Application {
 			CashAccount cashAccount = null;
 			if (useCashAccount) try {
 				logger.fine("Calling CashAccountClient.deleteCashAccount()");
-				cashAccount = cashAccountClient.deleteCashAccount(jwt, owner);
+				cashAccount = cashAccountClient.deleteCashAccount(owner);
 				if (cashAccount != null) {
 					broker.setCashAccountBalance(cashAccount.getBalance());
 					broker.setCashAccountCurrency(cashAccount.getCurrency());
@@ -464,10 +561,9 @@ public class BrokerService extends Application {
 //	@RolesAllowed({"StockTrader"}) //Couldn't get this to work; had to do it through the web.xml instead :(
 	public Feedback submitFeedback(@PathParam("owner") String owner, WatsonInput input, @Context HttpServletRequest request) {
 		Feedback feedback = null;
-		String jwt = request.getHeader("Authorization");
 
 		logger.fine("Calling AccountClient.submitFeedback()");
-		feedback = accountClient.submitFeedback(jwt, owner, input);
+		feedback = accountClient.submitFeedback(owner, input);
 
 		String answer = "feedback";
 		if (feedback==null) answer = "null";
@@ -476,7 +572,7 @@ public class BrokerService extends Application {
 		return feedback;
 	}
 
-	Broker[] getHardcodedBrokers() {
+	List<Broker> getHardcodedBrokers() {
 		Broker john = new Broker("John");
 		john.setTotal(1234.56);
 		john.setLoyalty("Basic");
@@ -495,7 +591,8 @@ public class BrokerService extends Application {
 		Broker eric = new Broker("Eric");
 		eric.setTotal(1234567.89);
 		eric.setLoyalty("Platinum");
-		Broker[] brokers = { john, karri, ryan, raunak, greg, eric };
+		var brokers = List.of(john, karri, ryan, raunak, greg, eric);
+
 		return brokers;
 	}
 

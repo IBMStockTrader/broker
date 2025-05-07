@@ -21,52 +21,59 @@ import com.ibm.hybrid.cloud.sample.stocktrader.broker.json.Feedback;
 import com.ibm.hybrid.cloud.sample.stocktrader.broker.json.Portfolio;
 import com.ibm.hybrid.cloud.sample.stocktrader.broker.json.WatsonInput;
 
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import jakarta.enterprise.context.ApplicationScoped;
 
-import jakarta.ws.rs.ApplicationPath;
-import jakarta.ws.rs.Consumes;
-import jakarta.ws.rs.DELETE;
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.POST;
-import jakarta.ws.rs.PUT;
-import jakarta.ws.rs.HeaderParam;
-import jakarta.ws.rs.PathParam;
-import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.QueryParam;
-import jakarta.ws.rs.Path;
+import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 
+import org.eclipse.microprofile.rest.client.annotation.RegisterClientHeaders;
 import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
+
+import java.util.List;
 
 
 @ApplicationPath("/")
 @Path("/")
 @ApplicationScoped
 @RegisterRestClient
+@RegisterClientHeaders //To enable JWT propagation
+// JWT is propagated.  See src/main/resources/META-INF/microprofile-config.properties
 /** mpRestClient "remote" interface for the Portfolio microservice */
 public interface PortfolioClient {
+//	@GET
+//	@Path("/")
+//	@Produces(MediaType.APPLICATION_JSON)
+//	public List<Portfolio> getPortfolios();
+
 	@GET
 	@Path("/")
 	@Produces(MediaType.APPLICATION_JSON)
-	public Portfolio[] getPortfolios(@HeaderParam("Authorization") String jwt);
+	@WithSpan(kind = SpanKind.CLIENT, value="PortfolioClient.getPortfolios")
+	public List<Portfolio> getPortfolios(@QueryParam("page") @DefaultValue("1") int pageNumber, @QueryParam("pageSize") @DefaultValue("10") int pageSize);
 
 	@POST
 	@Path("/{owner}")
 	@Produces(MediaType.APPLICATION_JSON)
-	public Portfolio createPortfolio(@HeaderParam("Authorization") String jwt, @PathParam("owner") String owner, @QueryParam("accountID") String accountID);
+	@WithSpan(kind = SpanKind.CLIENT, value="PortfolioClient.createPortfolio")
+	public Portfolio createPortfolio(@PathParam("owner") String owner, @QueryParam("accountID") String accountID);
 
 	@GET
 	@Path("/{owner}")
 	@Produces(MediaType.APPLICATION_JSON)
-	public Portfolio getPortfolio(@HeaderParam("Authorization") String jwt, @PathParam("owner") String owner, @QueryParam("immutable") boolean immutable);
+	@WithSpan(kind = SpanKind.CLIENT, value="PortfolioClient.getPortfolio")
+	public Portfolio getPortfolio(@PathParam("owner") String owner, @QueryParam("immutable") boolean immutable);
 
 	@PUT
 	@Path("/{owner}")
 	@Produces(MediaType.APPLICATION_JSON)
-	public Portfolio updatePortfolio(@HeaderParam("Authorization") String jwt, @PathParam("owner") String owner, @QueryParam("symbol") String symbol, @QueryParam("shares") int shares, @QueryParam("commission") double commission);
+	@WithSpan(kind = SpanKind.CLIENT, value="PortfolioClient.updatePortfolio")
+	public Portfolio updatePortfolio(@PathParam("owner") String owner, @QueryParam("symbol") String symbol, @QueryParam("shares") int shares, @QueryParam("commission") double commission);
 
 	@DELETE
 	@Path("/{owner}")
 	@Produces(MediaType.APPLICATION_JSON)
-	public Portfolio deletePortfolio(@HeaderParam("Authorization") String jwt, @PathParam("owner") String owner);
+	@WithSpan(kind = SpanKind.CLIENT, value="PortfolioClient.deletePortfolio")
+	public Portfolio deletePortfolio( @PathParam("owner") String owner);
 }

@@ -1,6 +1,6 @@
 /*
        Copyright 2020-2021 IBM Corp All Rights Reserved
-       Copyright 2022-2024 Kyndryl, All Rights Reserved
+       Copyright 2022-2025 Kyndryl, All Rights Reserved
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -21,63 +21,66 @@ import com.ibm.hybrid.cloud.sample.stocktrader.broker.json.Account;
 import com.ibm.hybrid.cloud.sample.stocktrader.broker.json.Feedback;
 import com.ibm.hybrid.cloud.sample.stocktrader.broker.json.WatsonInput;
 
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import jakarta.enterprise.context.ApplicationScoped;
 
-import jakarta.ws.rs.ApplicationPath;
-import jakarta.ws.rs.Consumes;
-import jakarta.ws.rs.DELETE;
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.POST;
-import jakarta.ws.rs.PUT;
-import jakarta.ws.rs.HeaderParam;
-import jakarta.ws.rs.QueryParam;
-import jakarta.ws.rs.PathParam;
-import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.Path;
+import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 
+import org.eclipse.microprofile.rest.client.annotation.RegisterClientHeaders;
 import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
+
+import java.util.List;
 
 
 @ApplicationPath("/")
 @Path("/")
 @ApplicationScoped
 @RegisterRestClient
+@RegisterClientHeaders //To enable JWT propagation
+// JWT is propagated.  See src/main/resources/META-INF/microprofile-config.properties
 /** mpRestClient "remote" interface for the Account microservice */
 public interface AccountClient {
 	@GET
 	@Path("/")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-    public Account[] getAccounts(@HeaderParam("Authorization") String jwt);
+	@WithSpan(kind = SpanKind.CLIENT, value="AccountClient.getAccounts")
+    public List<Account> getAccounts(@QueryParam("page") @DefaultValue("1") int pageNumber, @QueryParam("pageSize") @DefaultValue("10") int pageSize, @QueryParam("owners") List<String> owners);
 
 	@GET
 	@Path("/{id}")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-	public Account getAccount(@HeaderParam("Authorization") String jwt, @PathParam("id") String id, @QueryParam("total") double total);
+	@WithSpan(kind = SpanKind.CLIENT, value="AccountClient.getAccount")
+	public Account getAccount(@PathParam("id") String id, @QueryParam("total") double total);
 
 	@POST
 	@Path("/{id}")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-	public Account createAccount(@HeaderParam("Authorization") String jwt, @PathParam("id") String id);
+	@WithSpan(kind = SpanKind.CLIENT, value="AccountClient.createAccount")
+	public Account createAccount(@PathParam("id") String id);
 
 	@PUT
 	@Path("/{id}")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-	public Account updateAccount(@HeaderParam("Authorization") String jwt, @PathParam("id") String id, @QueryParam("total") double total);
+	@WithSpan(kind = SpanKind.CLIENT, value="AccountClient.updateAccount")
+	public Account updateAccount(@PathParam("id") String id, @QueryParam("total") double total);
 
 	@DELETE
 	@Path("/{id}")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-	public Account deleteAccount(@HeaderParam("Authorization") String jwt, @PathParam("id") String id);
+	@WithSpan(kind = SpanKind.CLIENT, value="AccountClient.deleteAccount")
+	public Account deleteAccount(@PathParam("id") String id);
 
 	@POST
 	@Path("/{id}/feedback")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-	public Feedback submitFeedback(@HeaderParam("Authorization") String jwt, @PathParam("id") String id, WatsonInput input);
+	@WithSpan(kind = SpanKind.CLIENT, value="AccountClient.submitFeedback")
+	public Feedback submitFeedback(@PathParam("id") String id, WatsonInput input);
 }

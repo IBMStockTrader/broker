@@ -18,6 +18,8 @@ package com.ibm.hybrid.cloud.sample.stocktrader.broker.client;
 
 import com.ibm.hybrid.cloud.sample.stocktrader.broker.json.CashAccount;
 
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import jakarta.ws.rs.ApplicationPath;
@@ -33,6 +35,7 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.core.MediaType;
 
+import org.eclipse.microprofile.rest.client.annotation.RegisterClientHeaders;
 import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 
 
@@ -40,41 +43,49 @@ import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 @Path("/")
 @ApplicationScoped
 @RegisterRestClient
+@RegisterClientHeaders //To enable JWT propagation
+// JWT is propagated.  See src/main/resources/META-INF/microprofile-config.properties
 /** mpRestClient "remote" interface for the CashAccount microservice */
 public interface CashAccountClient {
 	@GET
 	@Path("/{owner}")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-	public CashAccount getCashAccount(@HeaderParam("Authorization") String jwt, @PathParam("owner") String owner);
+	@WithSpan(kind = SpanKind.CLIENT, value="CashAccountClient.getCashAccount")
+	public CashAccount getCashAccount(@PathParam("owner") String owner);
 
 	@POST
 	@Path("/{owner}")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-	public CashAccount createCashAccount(@HeaderParam("Authorization") String jwt, @PathParam("owner") String owner, CashAccount cashAccount);
+	@WithSpan(kind = SpanKind.CLIENT, value="CashAccountClient.createCashAccount")
+	public CashAccount createCashAccount(@PathParam("owner") String owner, CashAccount cashAccount);
 
 	@PUT
 	@Path("/{owner}")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-	public CashAccount updateCashAccount(@HeaderParam("Authorization") String jwt, @PathParam("owner") String owner, CashAccount cashAccount);
+	@WithSpan(kind = SpanKind.CLIENT, value="CashAccountClient.updateCashAccount")
+	public CashAccount updateCashAccount(@PathParam("owner") String owner, CashAccount cashAccount);
 
 	@DELETE
 	@Path("/{owner}")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-	public CashAccount deleteCashAccount(@HeaderParam("Authorization") String jwt, @PathParam("owner") String owner);
+	@WithSpan(kind = SpanKind.CLIENT, value="CashAccountClient.deleteCashAccount")
+	public CashAccount deleteCashAccount(@PathParam("owner") String owner);
 
 	@PUT
 	@Path("/{owner}/debit")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-	public CashAccount debit(@HeaderParam("Authorization") String jwt, @PathParam("owner") String owner, @QueryParam("amount") double amount);
+	@WithSpan(kind = SpanKind.CLIENT, value="CashAccountClient.debit")
+	public CashAccount debit(@PathParam("owner") String owner, @QueryParam("amount") double amount);
 
 	@PUT
 	@Path("/{owner}/credit")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-	public CashAccount credit(@HeaderParam("Authorization") String jwt, @PathParam("owner") String owner, @QueryParam("amount") double amount);
+	@WithSpan(kind = SpanKind.CLIENT, value="CashAccountClient.credit")
+	public CashAccount credit(@PathParam("owner") String owner, @QueryParam("amount") double amount);
 }

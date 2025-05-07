@@ -59,7 +59,21 @@
             <version>6.1</version>
             <type>pom</type>
             <scope>provided</scope>
-        </dependency> 
+        </dependency>
+        <dependency>
+            <!-- this ships as part of MP 6.1 on OpenLiberty -->
+            <groupId>org.eclipse.microprofile.telemetry</groupId>
+            <artifactId>microprofile-telemetry-api</artifactId>
+            <type>pom</type>
+            <version>2.0</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.38</version>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>io.jaegertracing</groupId>
             <artifactId>jaeger-client</artifactId>

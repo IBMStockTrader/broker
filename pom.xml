@@ -76,11 +76,6 @@
             <version>4.13.2</version>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>io.smallrye</groupId>
-            <artifactId>smallrye-open-api-maven-plugin</artifactId>
-            <version>4.0.10</version>
-        </dependency>
     </dependencies>
 
     <build>

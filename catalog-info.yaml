@@ -32,10 +32,15 @@ spec:
   providesApis:
     - broker-api
   dependsOn:
-    - component:default/account-client-config
-    - component:default/cash-account-client-config
-    - component:default/portfolio-client-config
-    - component:default/trade-history-client-config
+    - component:default/account
+    - component:default/cash
+    - component:default/portfolio
+    - component:default/trade-history
+  consumesApis:
+    - default/account-api
+    - default/cash-account-api
+    - default/portfolio-api
+    - default/trade-history-api
 metadata:
   name: broker
   labels:

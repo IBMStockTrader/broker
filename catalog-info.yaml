@@ -1,36 +1,50 @@
 apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: stocktrader
+  description: Stock Trader
+spec:
+  owner: guests
+---
+apiVersion: backstage.io/v1alpha1
 kind: API
 spec:
   type: openapi
   lifecycle: production
-  owner: user:guest
+  owner: guests
   definition:
     $text: src/main/generated/openapi/openapi.yaml
 metadata:
-  name: account-api
+  name: broker-api
   tags:
     - java
-    - quarkus
+    - openliberty
 ---
 apiVersion: backstage.io/v1alpha1
 kind: Component
 spec:
-  type: application
+  # the type must be a service for the CI/CD tab to render unless you change the
+  # EntityPage.tsx to use a ComponentType of `application`
+  type: service
   lifecycle: production
-  owner: user:guest
+  system: stocktrader
+  owner: guests
   providesApis:
-    - account-api
+    - broker-api
   dependsOn:
-    - component:default/odm-client-config
-    - component:default/watson-client-config
+    - component:default/account-client-config
+    - component:default/cash-account-client-config
+    - component:default/portfolio-client-config
+    - component:default/trade-history-client-config
 metadata:
-  name: account
+  name: broker
   labels:
-    app.kubernetes.io/name: account
+    app.kubernetes.io/name: broker
     app.kubernetes.io/version: 1.0-SNAPSHOT
     app.quarkus.io/version: 3.23.3
   annotations:
-    backstage.io/source-location: url:https://github.com/IBMStockTrader/account
+    backstage.io/source-location: url:https://github.com/IBMStockTrader/broker
+    github.com/project-slug: IBMStockTrader/broker
   tags:
     - java
-    - quarkus
+    - openliberty

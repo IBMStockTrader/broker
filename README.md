@@ -14,6 +14,7 @@
    limitations under the License.
 -->
 
+
 This microservice is the controller for the IBM Stock Trader application.  The various clients talk solely
 to this microservice, which then takes care of coordinating calls to the downstream microservices and
 merging the results.  The following operations are available:

@@ -2,7 +2,7 @@
 
 Workflows are used to build and deploy the `broker` service.
 
-This file describes the workflows that are used to compile the app, build the Docker image, and publish it to Azure Container Registry (ACR) or AWS Elastic Container Registry (ECR).
+This file describes the workflows that are used to compile the app, build the Docker image, scan it for vulnerabilities, and publish it to Azure Container Registry (ACR) or AWS Elastic Container Registry (ECR).
 
 Workflows are defined in the following files:
 - [build-test-push-azure-acr.yml](build-test-push-azure-acr.yml)
@@ -40,6 +40,7 @@ ACR_LOGIN_SERVER - Your ACR login server (e.g., <acr-name>.azurecr.io)
 ## Azure Workflow
 This workflow:
 - Builds the application using Maven
+- Scans the built Docker image for vulnerabilities using Trivy before pushing
 - Pushes the Docker image to Azure Container Registry (ACR)
 - Updates the GitOps repository with the new image tag for AKS deployment
 

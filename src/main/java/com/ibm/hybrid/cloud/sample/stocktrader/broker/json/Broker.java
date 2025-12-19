@@ -41,6 +41,7 @@ public class Broker {
     private double commissions;
     private int free;
     private String sentiment;
+    private Sentiment stockSentiment;
     private double nextCommission;
     private double cashAccountBalance;
     private String cashAccountCurrency;
@@ -146,6 +147,14 @@ public class Broker {
 
     public void setSentiment(String newSentiment) {
         sentiment = newSentiment;
+    }
+
+    public Sentiment getStockSentiment() {
+        return stockSentiment;
+    }
+
+    public void setStockSentiment(Sentiment newStockSentiment) {
+        stockSentiment = newStockSentiment;
     }
 
     public double getNextCommission() {

@@ -185,6 +185,14 @@ spec:
                name: urls
                key: trade-history
                optional: true
+          - name: SENTIMENT_API_ENABLED
+            value: "false"
+          - name: SENTIMENT_API_URL
+            valueFrom:
+              configMapKeyRef:
+                name: urls
+                key: sentiment-api
+                optional: true
           - name: WLP_LOGGING_CONSOLE_FORMAT
             value: json
           - name: WLP_LOGGING_CONSOLE_SOURCE
